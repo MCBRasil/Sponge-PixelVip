@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -43,7 +44,6 @@ public class PVConfig {
 	        if (!config.getNode("groups").hasMapChildren()){
 	        	config.getNode("groups","vip1","commands").setComment(
 	        			"Add the commands to run when the player use the key for activation \n"
-		        		+ "Dont forget to add the command to change the player group for your vip plugin with your permissions plugin command.\n"
 		        		+ "You can use the variables:\n"
 		        		+ "{p} = Player name, {vip} = Vip group, {days} = Vip days, {playergroup} = Player group before activate vip");
 	        	config.getNode("groups","vip1","commands").setValue(Arrays.asList("broadcast &aThe player &6{p} &ahas acquired your &6{vip} &afor &6{days} &adays","give {p} minecraft:diamond 10", "eco give {p} 10000"));
@@ -103,7 +103,7 @@ public class PVConfig {
 	        config.getNode("strings","timeLeft").setValue(getString("&b- Time left: &6","strings","timeLeft"));	        
 	        config.getNode("strings","totalTime").setValue(getString("&b- Days: &6","strings","totalTime"));
 	        config.getNode("strings","timeKey").setValue(getString("&b- Key: &6","strings","timeKey"));	        	        
-	        config.getNode("strings","timeGroup").setValue(getString("&b- Group: &6","strings","timeGroup"));
+	        config.getNode("strings","timeGroup").setValue(getString("&b- Vip: &6","strings","timeGroup"));
 	        config.getNode("strings","timeActive").setValue(getString("&b- In Use: &6","strings","timeActive"));
 	        config.getNode("strings","activeVipSetTo").setValue(getString("&aYour active VIP is ","strings","activeVipSetTo"));
 	        config.getNode("strings","noGroups").setValue(getString("&cNo groups with name &6","strings","noGroups"));
@@ -111,6 +111,8 @@ public class PVConfig {
 	        config.getNode("strings","hours").setValue(getString(" &bhours","strings","hours"));
 	        config.getNode("strings","minutes").setValue(getString(" &bminutes","strings","minutes"));
 	        config.getNode("strings","and").setValue(getString(" &band","strings","and"));
+	        config.getNode("strings","vipEnded").setValue(getString(" &bYour vip &6{vip} &bhas ended. &eWe hope you enjoyed your Vip time &a:D","strings","vipEnded"));
+	        config.getNode("strings","lessThan").setValue(getString("&6Less than one minute to end your vip...","strings","lessThan"));
 			
 	        save();
 			
@@ -154,6 +156,7 @@ public class PVConfig {
 	public CommandResult activateVip(Player p, String key) throws CommandException {
 		if (getKeyInfo(key).length == 2){
 			String[] keyinfo = getKeyInfo(key);
+			delKey(key);
 			long expires = new Long(keyinfo[1])+plugin.getUtil().getNowMillis();
 			String group = keyinfo[0];
 			String pGroup = plugin.getPerms().getGroup(p);
@@ -162,26 +165,26 @@ public class PVConfig {
 			if (!vips.isEmpty()){
 				pGroup = vips.get(0)[2];
 			}
-			plugin.getGame().getScheduler().createSyncExecutor(plugin).schedule(new Runnable(){
-				@Override
-				public void run() {
-					for (String cmd:getListString("groups",group,"commands")){
+			
+			getListString("groups",group,"commands").forEach((cmd)->{
+				plugin.getExecutor().execute(new Runnable(){
+					@Override
+					public void run() {
 						plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), 
 								cmd.replace("{p}", p.getName())
 								.replace("{vip}", group)
 								.replace("{playergroup}", pdGroup)
 								.replace("{days}", String.valueOf(plugin.getUtil().millisToDay(keyinfo[1]))));
-					}
-				}				
-			},1 , TimeUnit.SECONDS);			
+					}				
+				});
+			});								
 			try {
 				config.getNode("activeVips",group,p.getUniqueId().toString(),"playerGroup").setValue(TypeToken.of(String.class), pGroup);
 				config.getNode("activeVips",group,p.getUniqueId().toString(),"duration").setValue(TypeToken.of(Long.class), expires);
 				setActive(p.getUniqueId().toString(),group,pdGroup);
 			} catch (ObjectMappingException e) {
 				e.printStackTrace();
-			}
-			delKey(key);			
+			}						
 			p.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","vipActivated")));
 			p.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("activeVip").replace("{vip}", group)));
 			p.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("activeDays").replace("{days}", String.valueOf(plugin.getUtil().millisToDay(keyinfo[1])))));			
@@ -193,6 +196,7 @@ public class PVConfig {
 	public void setActive(String uuid, String group, String pgroup){
 		String newVip = group;
 		String oldVip = pgroup;
+		
 		for (Object key:getGroupList()){
 			if (config.getNode("activeVips",key,uuid).hasMapChildren()){
 				try {
@@ -217,13 +221,32 @@ public class PVConfig {
 			}
 		}	
 		
+		String newVipf = newVip;
+		String oldVipf = oldVip;
 		for (String cmd:plugin.getConfig().getListString("configs","commandsToRunOnChangeVip")){
-			cmd = cmd.replace("{p}", plugin.getUtil().getUser(UUID.fromString(uuid)).getName());
-			if (!oldVip.equals("") && cmd.contains("{oldvip}")){
-				plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmd.replace("{oldvip}", oldVip));
-			}
+			String cmdf = cmd.replace("{p}", plugin.getUtil().getUser(UUID.fromString(uuid)).get().getName());
+			if (!oldVip.equals("") && cmdf.contains("{oldvip}")){
+				plugin.getExecutor().schedule(new Runnable(){
+					@Override
+					public void run() {
+						plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmdf.replace("{oldvip}", oldVipf));
+					}					
+				}, 1, TimeUnit.SECONDS);				
+			} else
 			if (!newVip.equals("") && cmd.contains("{newvip}")){
-				plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmd.replace("{newvip}", newVip));
+				plugin.getExecutor().schedule(new Runnable(){
+					@Override
+					public void run() {
+						plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmdf.replace("{newvip}", newVipf));
+					}					
+				}, 1, TimeUnit.SECONDS);
+			} else {
+				plugin.getExecutor().schedule(new Runnable(){
+					@Override
+					public void run() {
+						plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmdf.replace("{newvip}", newVipf));
+					}					
+				}, 1, TimeUnit.SECONDS);
 			}
 		}
 		save();
@@ -261,9 +284,15 @@ public class PVConfig {
 		}
 		if (plugin.getConfig().getVipInfo(uuid).size() == 0){			
 			for (String cmd:getListString("configs","commandsToRunOnVipFinish")){
-				if (cmd.contains("{vip}")){continue;}				
-				cmd = cmd.replace("{p}", p.getName()).replace("{playergroup}", oldGroup);
-				Sponge.getCommandManager().process(Sponge.getServer().getConsole(), cmd);
+				if (cmd.contains("{vip}")){continue;}		
+				final String oldGroupf = oldGroup;
+				plugin.getExecutor().schedule(new Runnable(){
+					@Override
+					public void run() {
+						String cmdf = cmd.replace("{p}", p.getName()).replace("{playergroup}", oldGroupf);
+						plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmdf);
+					}					
+				}, 1, TimeUnit.SECONDS);				
 			}
 		}
 		save();
@@ -320,7 +349,31 @@ public class PVConfig {
 		return config.getNode("groups").getChildrenMap().keySet();
 	}
 	
-	/**Return player's vip info.
+	public HashMap<String,List<String[]>> getVipList(){
+		HashMap<String,List<String[]>> vips = new HashMap<String,List<String[]>>();		
+		for (Object groupobj:getGroupList()){
+			for (Object uuidobj:config.getNode("activeVips",groupobj).getChildrenMap().keySet()){
+				String uuid = uuidobj.toString();
+				plugin.getLogger().info("UUID "+uuid); 
+				
+				List<String[]> vipInfo = getVipInfo(uuid);
+				List<String[]> activeVips = new ArrayList<String[]>();
+				for (String[] active:vipInfo){
+					if (active[3].equals("true")){
+						activeVips.add(active);
+						plugin.getLogger().info("Active Group "+active[1]); 
+					}
+				}
+				if (activeVips.size() > 0){
+					vips.put(uuid, activeVips);
+				}
+			}
+		}
+		return vips;
+	}
+	
+	/**Return player's vip info.<p>
+	 * [0] = Duration, [1] = Vip Group, [2] = Player Group, [3] = Is Active
 	 * @param puuid Player UUID as string.
 	 * @return {@code List<String[4]>}
 	 */
@@ -332,5 +385,13 @@ public class PVConfig {
 			}
 		}		
 		return vips;
+	}
+	
+	public HashMap<String, String> getCmdChoices(){
+		HashMap<String, String> choices = new HashMap<String, String>();
+		getGroupList().forEach((k)->{
+			choices.put(k.toString(), k.toString());
+		});
+		return choices;
 	}
 }

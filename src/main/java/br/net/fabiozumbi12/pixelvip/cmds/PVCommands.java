@@ -30,6 +30,11 @@ public class PVCommands {
 		Sponge.getCommandManager().register(plugin, setActive(), "changevip", "setctive", "trocarvip");
 	}    
     
+    public void reload(){
+    	Sponge.getCommandManager().removeMapping(Sponge.getCommandManager().get("newkey").get());
+    	Sponge.getCommandManager().register(plugin, newKey(), "newkey", "genkey", "gerarkey");
+    }
+    
     /**Command to generate new key.
 	 * 
 	 * @return CommandSpec
@@ -38,7 +43,7 @@ public class PVCommands {
 		return CommandSpec.builder()
 			    .description(Text.of("Generate new vip key for groups."))
 			    .permission("spongevip.cmd.newkey")
-			    .arguments(GenericArguments.string(Text.of("group")),GenericArguments.longNum(Text.of("days")))
+			    .arguments(GenericArguments.choices(Text.of("group"), plugin.getConfig().getCmdChoices()),GenericArguments.longNum(Text.of("days")))
 			    .executor((src, args) -> { {
 			    	String group = args.<String>getOne("group").get();
 			    	long days = args.<Long>getOne("days").get();
@@ -163,6 +168,7 @@ public class PVCommands {
 	}
 	
 	/**Command to sets the active vip, if more than one key activated.
+	 * @return 
 	 * 
 	 * @return CommandSpec
 	 */
@@ -176,7 +182,8 @@ public class PVCommands {
 			    		Player p = (Player) src;
 			    		String group = args.<String>getOne("vip").get();
 			    		List<String[]> vipInfo = plugin.getConfig().getVipInfo(p.getUniqueId().toString());
-				    	if (vipInfo.size() > 0){
+			    		
+				    	if (vipInfo.size() > 0){				    		
 				    		for (String[] vip:vipInfo){
 				    			if (vip[1].equalsIgnoreCase(group)){
 				    				plugin.getConfig().setActive(p.getUniqueId().toString(), group, vip[2]);

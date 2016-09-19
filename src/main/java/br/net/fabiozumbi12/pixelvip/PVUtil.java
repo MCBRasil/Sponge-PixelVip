@@ -3,6 +3,7 @@ package br.net.fabiozumbi12.pixelvip;
 import java.security.SecureRandom;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -60,20 +61,14 @@ public class PVUtil {
 	    return new String(result);
 	}
 	
-	public User getUser(String name){
-		UserStorageService uss = Sponge.getGame().getServiceManager().provide(UserStorageService.class).get();
-		if (uss.get(name).isPresent()){
-			return uss.get(name).get();
-		}		
-		return null;
+	public Optional<User> getUser(String name){
+		UserStorageService uss = Sponge.getGame().getServiceManager().provide(UserStorageService.class).get();				
+		return uss.get(name);
 	}
 	
-	public User getUser(UUID uuid){
-		UserStorageService uss = Sponge.getGame().getServiceManager().provide(UserStorageService.class).get();
-		if (uss.get(uuid).isPresent()){
-			return uss.get(uuid).get();
-		}		
-		return null;
+	public Optional<User> getUser(UUID uuid){
+		UserStorageService uss = Sponge.getGame().getServiceManager().provide(UserStorageService.class).get();				
+		return uss.get(uuid);
 	}
 	
 	public CommandResult sendVipTime(CommandSource src, String UUID, String name) throws CommandException{	
@@ -81,7 +76,7 @@ public class PVUtil {
 		if (vips.size() > 0){
 			src.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","vipInfoFor")+name+":"));
 			src.sendMessage(plugin.getUtil().toText("&b---------------------------------------------"));
-			for (String[] vipInfo:vips){
+			vips.forEach((vipInfo)->{
 				if (vipInfo.length == 4){
 					String time = plugin.getUtil().millisToMessage(new Long(vipInfo[0]));
 					if (plugin.getConfig().getBoolean(true, "activeVips",vipInfo[1],UUID.toString(),"active")){
@@ -91,8 +86,8 @@ public class PVUtil {
 			    	src.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("timeGroup")+vipInfo[1]));		
 			    	src.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("timeActive")+vipInfo[3]));	
 			    	src.sendMessage(plugin.getUtil().toText("&b---------------------------------------------"));	
-				} 
-			}
+				}
+			});			
 			return CommandResult.success();
 		} else {
 			throw new CommandException(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","playerNotVip")));	
@@ -113,7 +108,11 @@ public class PVUtil {
 		if (min > 0){
 			msg.append("&6"+min+plugin.getConfig().getLang("minutes")+", ");
 		}
-		msg = msg.replace(msg.lastIndexOf(","), msg.lastIndexOf(",")+1, ".").replace(msg.lastIndexOf(","), msg.lastIndexOf(",")+1, plugin.getConfig().getLang("and"));
+		try{
+			msg = msg.replace(msg.lastIndexOf(","), msg.lastIndexOf(",")+1, ".").replace(msg.lastIndexOf(","), msg.lastIndexOf(",")+1, plugin.getConfig().getLang("and"));
+		} catch(StringIndexOutOfBoundsException ex){
+			return plugin.getConfig().getLang("lessThan");
+		}		
 		return msg.toString();
 	}
 }
