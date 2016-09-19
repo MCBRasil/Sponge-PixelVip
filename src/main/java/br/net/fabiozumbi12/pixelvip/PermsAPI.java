@@ -1,4 +1,4 @@
-package br.net.fabiozumbi12.spongevip;
+package br.net.fabiozumbi12.pixelvip;
 
 import org.spongepowered.api.Game;
 import org.spongepowered.api.entity.living.player.User;

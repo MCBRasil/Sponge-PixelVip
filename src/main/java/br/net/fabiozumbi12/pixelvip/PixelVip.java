@@ -1,4 +1,4 @@
-package br.net.fabiozumbi12.spongevip;
+package br.net.fabiozumbi12.pixelvip;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -21,16 +21,16 @@ import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.text.Text;
 import org.spongepowered.api.Game;
 
-import br.net.fabiozumbi12.spongevip.cmds.SVCommands;
+import br.net.fabiozumbi12.pixelvip.cmds.PVCommands;
 
 import com.google.inject.Inject;
 
-@Plugin(id = "spongevip", 
-name = "SpongeVip", 
+@Plugin(id = "pixelvip", 
+name = "PixelVip", 
 version = "1.0.0",
 authors="FabioZumbi12", 
 description="Plugin to give VIP to your players.")
-public class SpongeVip {
+public class PixelVip {
 	
 	@Inject private Logger logger;
 	public Logger getLogger(){	
@@ -52,8 +52,8 @@ public class SpongeVip {
 		return configManager;
 	}
 	
-	private SVConfig config;
-	public SVConfig getConfig(){
+	private PVConfig config;
+	public PVConfig getConfig(){
 		return config;
 	}
 	
@@ -67,8 +67,8 @@ public class SpongeVip {
 		return this.game;
 	}
 	
-	private SVUtil util;
-	public SVUtil getUtil(){
+	private PVUtil util;
+	public PVUtil getUtil(){
 		return this.util;
 	}
 	
@@ -77,24 +77,24 @@ public class SpongeVip {
 	@Listener
     public void onServerStart(GameStartedServerEvent event) {
 		logger.info("Init utils...");
-		this.util = new SVUtil(this);
+		this.util = new PVUtil(this);
 		
 		logger.info("Init config...");
 		configManager = HoconConfigurationLoader.builder().setFile(defConfig).build();				
-		this.config = new SVConfig(this, configDir, defConfig);
+		this.config = new PVConfig(this, configDir, defConfig);
 		
 		logger.info("Init perms...");
 		this.perms = new PermsAPI(game);
 		
 		logger.info("Init commands...");
-		new SVCommands(this);
+		new PVCommands(this);
 		CommandSpec spongevip = CommandSpec.builder()
 			    .description(Text.of("Use to see the plugin info and reload."))
 			    .permission("spongevip.cmd.reload")
 			    .arguments(GenericArguments.optional(GenericArguments.string(Text.of("reload"))))
 			    .executor((src, args) -> { {
 			    	if (args.hasAny("reload")){
-			    		this.config = new SVConfig(this, configDir, defConfig);
+			    		this.config = new PVConfig(this, configDir, defConfig);
 			    		logger.info("SpongeVip reloaded");
 			    	} else {
 			    		src.sendMessage(util.toText("&a> SpongeVip "+version+" by &6FabioZumbi12"));

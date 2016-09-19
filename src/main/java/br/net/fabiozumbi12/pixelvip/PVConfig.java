@@ -1,4 +1,4 @@
-package br.net.fabiozumbi12.spongevip;
+package br.net.fabiozumbi12.pixelvip;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,12 +23,12 @@ import org.spongepowered.api.entity.living.player.User;
 
 import com.google.common.reflect.TypeToken;
 
-public class SVConfig {	
+public class PVConfig {	
 		
 	private CommentedConfigurationNode config;
-	private SpongeVip plugin;
+	private PixelVip plugin;
 	
-	public SVConfig(SpongeVip plugin, Path defDir, File defConfig){
+	public PVConfig(PixelVip plugin, Path defDir, File defConfig){
 		this.plugin = plugin;
 		try {
 			Files.createDirectories(defDir);
@@ -86,7 +86,7 @@ public class SVConfig {
 	        }
 	        
 	        //strings
-	        config.getNode("strings","_pluginTag").setValue(getString("&7[&6SpongeVip&7] ","strings","_pluginTag"));	
+	        config.getNode("strings","_pluginTag").setValue(getString("&7[&6PixelVip&7] ","strings","_pluginTag"));	
 	        config.getNode("strings","noPlayersByName").setValue(getString("&cTheres no players with this name!","strings","noPlayersByName"));	
 	        config.getNode("strings","onlyPlayers").setValue(getString("&cOnly players ca use this command!","strings","onlyPlayers"));	
 	        config.getNode("strings","noKeys").setValue(getString("&aTheres no available keys! Use &6/newkey &ato generate one.","strings","noKeys"));

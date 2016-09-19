@@ -1,4 +1,4 @@
-package br.net.fabiozumbi12.spongevip;
+package br.net.fabiozumbi12.pixelvip;
 
 import java.security.SecureRandom;
 import java.util.Calendar;
@@ -16,10 +16,10 @@ import org.spongepowered.api.service.user.UserStorageService;
 import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.serializer.TextSerializers;
 
-public class SVUtil {
-	private SpongeVip plugin;
+public class PVUtil {
+	private PixelVip plugin;
 
-	public SVUtil(SpongeVip plugin){
+	public PVUtil(PixelVip plugin){
 		this.plugin = plugin;
 	}
 	

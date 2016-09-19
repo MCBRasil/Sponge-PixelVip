@@ -1,4 +1,4 @@
-package br.net.fabiozumbi12.spongevip.cmds;
+package br.net.fabiozumbi12.pixelvip.cmds;
 
 import java.util.Collection;
 import java.util.List;
@@ -13,13 +13,13 @@ import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.entity.living.player.User;
 import org.spongepowered.api.text.Text;
 
-import br.net.fabiozumbi12.spongevip.SpongeVip;
+import br.net.fabiozumbi12.pixelvip.PixelVip;
 
-public class SVCommands {
+public class PVCommands {
 
-	private SpongeVip plugin;
+	private PixelVip plugin;
 	
-    public SVCommands(SpongeVip plugin){
+    public PVCommands(PixelVip plugin){
 		this.plugin = plugin;
 				
 		Sponge.getCommandManager().register(plugin, newKey(), "newkey", "genkey", "gerarkey");
