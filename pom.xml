@@ -8,16 +8,16 @@
   <packaging>jar</packaging>
 
   <name>PixelVip</name>
-  <url>https://github.com/FabioZumbi12/Sponge-SpongeVip</url>
+  <url>https://github.com/FabioZumbi12/Sponge-PixelVip</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
   <scm>
-     <connection>scm:git:git@github.com:FabioZumbi12/Sponge-SpongeVip.git</connection>
-     <developerConnection>scm:git:git@github.com:FabioZumbi12/Sponge-SpongeVip.git</developerConnection>
-     <url>https://github.com/FabioZumbi12/Sponge-SpongeVip/tree/master</url>
+     <connection>scm:git:git@github.com:FabioZumbi12/Sponge-PixelVip.git</connection>
+     <developerConnection>scm:git:git@github.com:FabioZumbi12/Sponge-PixelVip.git</developerConnection>
+     <url>https://github.com/FabioZumbi12/Sponge-PixelVip/tree/master</url>
      <tag>${project.version}</tag>
   </scm>
   
