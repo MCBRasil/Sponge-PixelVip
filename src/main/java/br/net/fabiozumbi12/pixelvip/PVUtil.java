@@ -76,17 +76,15 @@ public class PVUtil {
 		if (vips.size() > 0){
 			src.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","vipInfoFor")+name+":"));
 			src.sendMessage(plugin.getUtil().toText("&b---------------------------------------------"));
-			vips.forEach((vipInfo)->{
-				if (vipInfo.length == 4){
-					String time = plugin.getUtil().millisToMessage(new Long(vipInfo[0]));
-					if (plugin.getConfig().getBoolean(true, "activeVips",vipInfo[1],UUID.toString(),"active")){
-						time = plugin.getUtil().millisToMessage(new Long(vipInfo[0])-plugin.getUtil().getNowMillis());
-					}
-			    	src.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("timeLeft")+time));
-			    	src.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("timeGroup")+vipInfo[1]));		
-			    	src.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("timeActive")+vipInfo[3]));	
-			    	src.sendMessage(plugin.getUtil().toText("&b---------------------------------------------"));	
+			vips.stream().filter(v->v.length == 4).forEach((vipInfo)->{
+				String time = plugin.getUtil().millisToMessage(new Long(vipInfo[0]));
+				if (plugin.getConfig().getBoolean(true, "activeVips",vipInfo[1],UUID.toString(),"active")){
+					time = plugin.getUtil().millisToMessage(new Long(vipInfo[0])-plugin.getUtil().getNowMillis());
 				}
+		    	src.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("timeLeft")+time));
+		    	src.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("timeGroup")+vipInfo[1]));		
+		    	src.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("timeActive")+vipInfo[3]));	
+		    	src.sendMessage(plugin.getUtil().toText("&b---------------------------------------------"));
 			});			
 			return CommandResult.success();
 		} else {

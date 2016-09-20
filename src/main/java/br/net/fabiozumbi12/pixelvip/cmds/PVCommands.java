@@ -28,11 +28,19 @@ public class PVCommands {
 		Sponge.getCommandManager().register(plugin, vipTime(), "viptime", "tempovip");
 		Sponge.getCommandManager().register(plugin, removeVip(), "removevip", "delvip");
 		Sponge.getCommandManager().register(plugin, setActive(), "changevip", "setctive", "trocarvip");
+		Sponge.getCommandManager().register(plugin, addVip(), "givevip", "addvip", "darvip");
+		Sponge.getCommandManager().register(plugin, setVip(), "setvip");
 	}    
     
     public void reload(){
     	Sponge.getCommandManager().removeMapping(Sponge.getCommandManager().get("newkey").get());
     	Sponge.getCommandManager().register(plugin, newKey(), "newkey", "genkey", "gerarkey");
+    	    	
+    	Sponge.getCommandManager().removeMapping(Sponge.getCommandManager().get("givevip").get());
+    	Sponge.getCommandManager().register(plugin, addVip(), "givevip", "addvip", "darvip");
+    	
+    	Sponge.getCommandManager().removeMapping(Sponge.getCommandManager().get("setvip").get());
+    	Sponge.getCommandManager().register(plugin, setVip(), "setvip");
     }
     
     /**Command to generate new key.
@@ -42,7 +50,7 @@ public class PVCommands {
 	private CommandSpec newKey() {
 		return CommandSpec.builder()
 			    .description(Text.of("Generate new vip key for groups."))
-			    .permission("spongevip.cmd.newkey")
+			    .permission("pixelvip.cmd.newkey")
 			    .arguments(GenericArguments.choices(Text.of("group"), plugin.getConfig().getCmdChoices()),GenericArguments.longNum(Text.of("days")))
 			    .executor((src, args) -> { {
 			    	String group = args.<String>getOne("group").get();
@@ -75,7 +83,7 @@ public class PVCommands {
 	public CommandSpec listKeys() {
 		return CommandSpec.builder()
 			    .description(Text.of("List all available keys."))
-			    .permission("spongevip.cmd.listkeys")
+			    .permission("pixelvip.cmd.listkeys")
 			    .executor((src, args) -> { {
 			    	
 			    	Collection<Object> keys = plugin.getConfig().getListKeys();
@@ -102,13 +110,13 @@ public class PVCommands {
 	public CommandSpec useKey() {
 		return CommandSpec.builder()
 			    .description(Text.of("Use a key to activate the Vip."))
-			    .permission("spongevip.cmd.player")
+			    .permission("pixelvip.cmd.player")
 			    .arguments(GenericArguments.string(Text.of("key")))
 			    .executor((src, args) -> { {
 			    	if (src instanceof Player){
 			    		Player p = (Player) src;
 			    		String key = args.<String>getOne(Text.of("key")).get();
-				    	return plugin.getConfig().activateVip(p, key);
+				    	return plugin.getConfig().activateVip(p, key, "", 0);
 			    	}
 			    	throw new CommandException(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","onlyPlayers")));	    	
 			    }			    	
@@ -123,22 +131,20 @@ public class PVCommands {
 	public CommandSpec vipTime() {
 		return CommandSpec.builder()
 			    .description(Text.of("Use to check the vip time."))
-			    .permission("spongevip.cmd.player")
+			    .permission("pixelvip.cmd.player")
 			    .arguments(GenericArguments.optional(GenericArguments.user(Text.of("player"))))
 			    .executor((src, args) -> { {
-			    	if (src instanceof Player){
-			    		return plugin.getUtil().sendVipTime(src, ((Player)src).getUniqueId().toString(), ((Player)src).getName());
-			    	} else 
-			    		if (args.hasAny("player")){
-			    			Optional<User> optp = args.<User>getOne("player");
-			    			if (optp.isPresent()){
-			    				User p = optp.get();
-				    			return plugin.getUtil().sendVipTime(src, p.getUniqueId().toString(), p.getName());			    			
-				    		} else {
-				    			throw new CommandException(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","noPlayersByName")));	
-				    		}
-			    	}
-			    	throw new CommandException(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","onlyPlayers")));	    	
+			    	if (src.hasPermission("pixelvip.cmd.player.others") && args.hasAny("player")){
+		    			Optional<User> optp = args.<User>getOne("player");
+		    			if (optp.isPresent()){
+		    				User p = optp.get();
+			    			return plugin.getUtil().sendVipTime(src, p.getUniqueId().toString(), p.getName());			    			
+			    		} else {
+			    			throw new CommandException(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","noPlayersByName")));	
+			    		}
+		    		} else {
+		    			return plugin.getUtil().sendVipTime(src, ((Player)src).getUniqueId().toString(), ((Player)src).getName());
+		    		}	    	
 			    }			    	
 			    })
 			    .build();	    
@@ -151,7 +157,7 @@ public class PVCommands {
 	public CommandSpec removeVip() {
 		return CommandSpec.builder()
 			    .description(Text.of("Use to remove a vip of player."))
-			    .permission("spongevip.cmd.removevip")
+			    .permission("pixelvip.cmd.removevip")
 			    .arguments(GenericArguments.user(Text.of("player")),GenericArguments.optional(GenericArguments.string(Text.of("vip"))))
 			    .executor((src, args) -> { {			    	
 			    	Optional<User> optp = args.<User>getOne("player");
@@ -159,6 +165,7 @@ public class PVCommands {
 			    	if (optp.isPresent()){
 			    		User p = optp.get();
 			    		plugin.getConfig().removeVip(p, optg);
+			    		src.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","vipsRemoved")));
 			    		return CommandResult.success();
 			    	}
 			    	throw new CommandException(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","noPlayersByName")));
@@ -175,7 +182,7 @@ public class PVCommands {
 	public CommandSpec setActive() {
 		return CommandSpec.builder()
 			    .description(Text.of("Use to change your active VIP, if more keys activated."))
-			    .permission("spongevip.cmd.player")
+			    .permission("pixelvip.cmd.player")
 			    .arguments(GenericArguments.string(Text.of("vip")))
 			    .executor((src, args) -> { {			   
 			    	if (src instanceof Player){
@@ -185,9 +192,9 @@ public class PVCommands {
 			    		
 				    	if (vipInfo.size() > 0){				    		
 				    		for (String[] vip:vipInfo){
-				    			if (vip[1].equalsIgnoreCase(group)){
-				    				plugin.getConfig().setActive(p.getUniqueId().toString(), group, vip[2]);
-				    				p.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","activeVipSetTo")+group));
+				    			if (vip[1].equalsIgnoreCase(group)){				    				
+				    				plugin.getConfig().setActive(p.getUniqueId().toString(), vip[1], vip[2]);
+				    				p.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","activeVipSetTo")+vip[1]));
 				    				return CommandResult.success();
 				    			}
 				    		}
@@ -198,5 +205,54 @@ public class PVCommands {
 			    }			    	
 			    })
 			    .build();	    
+	}
+	
+	/**Command to add a vip for a player without key.
+	 * @return 
+	 * 
+	 * @return CommandSpec
+	 */
+	public CommandSpec addVip() {
+		return CommandSpec.builder()
+			    .description(Text.of("Use to add a vip for a player without key."))
+			    .permission("pixelvip.cmd.addvip")
+			    .arguments(GenericArguments.user(Text.of("player")),GenericArguments.choices(Text.of("vip"), plugin.getConfig().getCmdChoices()),GenericArguments.longNum(Text.of("days")))
+			    .executor((src, args) -> { {			   
+			    	Optional<User> p = args.<User>getOne("player");
+			    	if (!p.isPresent()){
+			    		throw new CommandException(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","noPlayersByName")));
+			    	}
+			    	String group = args.<String>getOne(Text.of("vip")).get();
+			    	long days = args.<Long>getOne(Text.of("days")).get();
+			    	return plugin.getConfig().activateVip(p.get(), "", group, days);
+			    }			    	
+			    })
+			    .build();
+	}
+	
+	/**Command to set a vip without activation and without key.
+	 * @return 
+	 * 
+	 * @return CommandSpec
+	 */
+	public CommandSpec setVip() {
+		return CommandSpec.builder()
+			    .description(Text.of("Use to set a vip without activation and without key."))
+			    .permission("pixelvip.cmd.setvip")
+			    .arguments(GenericArguments.user(Text.of("player")),GenericArguments.choices(Text.of("vip"), plugin.getConfig().getCmdChoices()),GenericArguments.longNum(Text.of("days")))
+			    .executor((src, args) -> { {			   
+			    	Optional<User> p = args.<User>getOne("player");
+			    	if (!p.isPresent()){
+			    		throw new CommandException(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","noPlayersByName")));
+			    	}
+			    	String group = args.<String>getOne(Text.of("vip")).get();
+			    	long days = args.<Long>getOne(Text.of("days")).get();
+			    	
+			    	plugin.getConfig().setVip(p.get(), group, plugin.getUtil().dayToMillis(days));		
+			    	src.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","vipSet")));
+			    	return CommandResult.success();
+			    }			    	
+			    })
+			    .build();
 	}
 }

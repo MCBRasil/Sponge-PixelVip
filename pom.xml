@@ -4,7 +4,7 @@
 
   <groupId>br.net.fabiozumbi12</groupId>
   <artifactId>PixelVip</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
   <packaging>jar</packaging>
 
   <name>PixelVip</name>
@@ -109,7 +109,7 @@
           </items>
         </configuration>
       </plugin>
-
+      
     </plugins>
   </build>
   <description>A Sponge plugin for manage VIPs on server.</description>

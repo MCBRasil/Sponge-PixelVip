@@ -19,7 +19,6 @@ import ninja.leaping.configurate.objectmapping.ObjectMappingException;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.command.CommandException;
 import org.spongepowered.api.command.CommandResult;
-import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.entity.living.player.User;
 
 import com.google.common.reflect.TypeToken;
@@ -28,6 +27,7 @@ public class PVConfig {
 		
 	private CommentedConfigurationNode config;
 	private PixelVip plugin;
+	private int delay = 0;
 	
 	public PVConfig(PixelVip plugin, Path defDir, File defConfig){
 		this.plugin = plugin;
@@ -57,6 +57,9 @@ public class PVConfig {
 	        config.getNode("configs","key-size").setComment("Sets the length of your vip keys.");
 	        config.getNode("configs","key-size").setValue(getInt(10,"configs","key-size"));
 	        
+	        config.getNode("configs","cmdToReloadPermPlugin").setComment("Command to reload the permissions plugin after some action.");
+	        config.getNode("configs","cmdToReloadPermPlugin").setValue(getString("pex reload","configs","cmdToReloadPermPlugin"));
+	        
 	        config.getNode("configs","cmdOnRemoveVip").setComment("Command to run when a vip is removed by command.");
 	        config.getNode("configs","cmdOnRemoveVip").setValue(getString("pex user {p} parent delete group {vip}","configs","cmdOnRemoveVip"));
 	        	
@@ -77,12 +80,12 @@ public class PVConfig {
 	        	        
 	        if (getListString("configs","commandsToRunOnVipFinish").size() == 0){	        	
 	        	config.getNode("configs","commandsToRunOnVipFinish")
-	        	.setValue(Arrays.asList("pex user {p} parent delete group {vip}","pex user {p} parent add group {playergroup}","pex reload"));
+	        	.setValue(Arrays.asList("pex user {p} parent delete group {vip}","pex user {p} parent add group {playergroup}"));
 	        }   
 	        
 	        if (getListString("configs","commandsToRunOnChangeVip").size() == 0){	        	
 	        	config.getNode("configs","commandsToRunOnChangeVip")
-	        	.setValue(Arrays.asList("pex user {p} parent add group {newvip}","pex user {p} parent delete group {oldvip}","pex reload"));
+	        	.setValue(Arrays.asList("pex user {p} parent add group {newvip}","pex user {p} parent delete group {oldvip}"));
 	        }
 	        
 	        //strings
@@ -113,6 +116,8 @@ public class PVConfig {
 	        config.getNode("strings","and").setValue(getString(" &band","strings","and"));
 	        config.getNode("strings","vipEnded").setValue(getString(" &bYour vip &6{vip} &bhas ended. &eWe hope you enjoyed your Vip time &a:D","strings","vipEnded"));
 	        config.getNode("strings","lessThan").setValue(getString("&6Less than one minute to end your vip...","strings","lessThan"));
+	        config.getNode("strings","vipsRemoved").setValue(getString("&aVip(s) of player removed with success!","strings","vipsRemoved"));
+	        config.getNode("strings","vipSet").setValue(getString("&aVip set with success for this player!","strings","vipSet"));
 			
 	        save();
 			
@@ -126,7 +131,7 @@ public class PVConfig {
 			plugin.getCfManager().save(config);
 		} catch (IOException e) {
 			e.printStackTrace();
-		}
+		}		
 	}
 	
 	public void addKey(String key, String group, long millis){		
@@ -153,44 +158,93 @@ public class PVConfig {
 		return new String[0];
 	}
 		
-	public CommandResult activateVip(Player p, String key) throws CommandException {
+	public CommandResult activateVip(User p, String key, String group, long days) throws CommandException {
 		if (getKeyInfo(key).length == 2){
 			String[] keyinfo = getKeyInfo(key);
 			delKey(key);
-			long expires = new Long(keyinfo[1])+plugin.getUtil().getNowMillis();
-			String group = keyinfo[0];
-			String pGroup = plugin.getPerms().getGroup(p);
-			String pdGroup = plugin.getPerms().getGroup(p);
-			List<String[]> vips = plugin.getConfig().getVipInfo(p.getUniqueId().toString());
-			if (!vips.isEmpty()){
-				pGroup = vips.get(0)[2];
-			}
-			
-			getListString("groups",group,"commands").forEach((cmd)->{
-				plugin.getExecutor().execute(new Runnable(){
-					@Override
-					public void run() {
-						plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), 
-								cmd.replace("{p}", p.getName())
-								.replace("{vip}", group)
-								.replace("{playergroup}", pdGroup)
-								.replace("{days}", String.valueOf(plugin.getUtil().millisToDay(keyinfo[1]))));
-					}				
-				});
-			});								
-			try {
-				config.getNode("activeVips",group,p.getUniqueId().toString(),"playerGroup").setValue(TypeToken.of(String.class), pGroup);
-				config.getNode("activeVips",group,p.getUniqueId().toString(),"duration").setValue(TypeToken.of(Long.class), expires);
-				setActive(p.getUniqueId().toString(),group,pdGroup);
-			} catch (ObjectMappingException e) {
-				e.printStackTrace();
-			}						
-			p.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","vipActivated")));
-			p.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("activeVip").replace("{vip}", group)));
-			p.sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("activeDays").replace("{days}", String.valueOf(plugin.getUtil().millisToDay(keyinfo[1])))));			
+											
+			enableVip(p, keyinfo[0], new Long(keyinfo[1]));
 			return CommandResult.success();
+		} else if (!group.equals("")){			
+			enableVip(p, group, plugin.getUtil().dayToMillis(days));
+			return CommandResult.success();
+		} else {
+			throw new CommandException(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","invalidKey")));	
+		}		
+	}
+	
+	private void enableVip(User p, String group, long durMillis){		
+		int count = 0;
+		long durf = durMillis;	
+		for (String[] k:getVipInfo(p.getUniqueId().toString())){
+			if (k[1].equals(group)){	
+				durMillis += new Long(k[0]);
+				count++;
+				break;
+			}
+		}			
+		
+		if (count == 0){
+			durMillis += plugin.getUtil().getNowMillis();
 		}
-		throw new CommandException(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","invalidKey")));	
+		
+		String pGroup = plugin.getPerms().getGroup(p);
+		String pdGroup = pGroup;
+		List<String[]> vips = plugin.getConfig().getVipInfo(p.getUniqueId().toString());
+		if (!vips.isEmpty()){
+			pGroup = vips.get(0)[2];
+		}
+					
+		getListString("groups",group,"commands").forEach((cmd)->{
+			plugin.getGame().getScheduler().createTaskBuilder().delay(delay*100, TimeUnit.MILLISECONDS).execute(t -> {				
+				plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), 
+						cmd.replace("{p}", p.getName())
+						.replace("{vip}", group)
+						.replace("{playergroup}", pdGroup)
+						.replace("{days}", String.valueOf(plugin.getUtil().millisToDay(durf))));
+			}).submit(plugin);			
+			delay++;
+		});				
+		try {
+			config.getNode("activeVips",group,p.getUniqueId().toString(),"playerGroup").setValue(TypeToken.of(String.class), pGroup);
+			config.getNode("activeVips",group,p.getUniqueId().toString(),"duration").setValue(TypeToken.of(Long.class), durMillis);
+			setActive(p.getUniqueId().toString(),group,pdGroup);
+		} catch (ObjectMappingException e) {
+			e.printStackTrace();
+		}		
+		if (p.isOnline()){
+			p.getPlayer().get().sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("_pluginTag","vipActivated")));
+			p.getPlayer().get().sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("activeVip").replace("{vip}", group)));
+			p.getPlayer().get().sendMessage(plugin.getUtil().toText(plugin.getConfig().getLang("activeDays").replace("{days}", String.valueOf(plugin.getUtil().millisToDay(durMillis)))));
+		}
+	}
+	
+	public void setVip(User p, String group, long durMillis){
+		int count = 0;
+		for (String[] k:getVipInfo(p.getUniqueId().toString())){
+			if (k[1].equals(group)){	
+				durMillis += new Long(k[0]);
+				count++;
+				break;
+			}
+		}		
+		
+		if (count == 0){
+			durMillis += plugin.getUtil().getNowMillis();
+		}
+		
+		String pGroup = plugin.getPerms().getGroup(p);
+		List<String[]> vips = plugin.getConfig().getVipInfo(p.getUniqueId().toString());
+		if (!vips.isEmpty()){
+			pGroup = vips.get(0)[2];
+		}					
+		try {
+			config.getNode("activeVips",group,p.getUniqueId().toString(),"playerGroup").setValue(TypeToken.of(String.class), pGroup);	
+			config.getNode("activeVips",group,p.getUniqueId().toString(),"duration").setValue(TypeToken.of(Long.class), durMillis);			
+			setActive(p.getUniqueId().toString(),group,pGroup);
+		} catch (ObjectMappingException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	public void setActive(String uuid, String group, String pgroup){
@@ -219,42 +273,42 @@ public class PVConfig {
 					e.printStackTrace();
 				}
 			}
-		}	
-		
-		String newVipf = newVip;
-		String oldVipf = oldVip;
+		}			
+		runChangeVipCmds(uuid, newVip, oldVip);		
+		reloadPerms();
+		save();
+	}
+	
+	public void runChangeVipCmds(String puuid, String newVip, String oldVip){
 		for (String cmd:plugin.getConfig().getListString("configs","commandsToRunOnChangeVip")){
-			String cmdf = cmd.replace("{p}", plugin.getUtil().getUser(UUID.fromString(uuid)).get().getName());
+			String cmdf = cmd.replace("{p}", plugin.getUtil().getUser(UUID.fromString(puuid)).get().getName());
 			if (!oldVip.equals("") && cmdf.contains("{oldvip}")){
-				plugin.getExecutor().schedule(new Runnable(){
-					@Override
-					public void run() {
-						plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmdf.replace("{oldvip}", oldVipf));
-					}					
-				}, 1, TimeUnit.SECONDS);				
+				plugin.getGame().getScheduler().createTaskBuilder().delay(delay*100, TimeUnit.MILLISECONDS).execute(t -> {
+					plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmdf.replace("{oldvip}", oldVip));
+				}).submit(plugin);
+				delay++;
 			} else
-			if (!newVip.equals("") && cmd.contains("{newvip}")){
-				plugin.getExecutor().schedule(new Runnable(){
-					@Override
-					public void run() {
-						plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmdf.replace("{newvip}", newVipf));
-					}					
-				}, 1, TimeUnit.SECONDS);
+			if (!newVip.equals("") && cmdf.contains("{newvip}")){
+				plugin.getGame().getScheduler().createTaskBuilder().delay(delay*100, TimeUnit.MILLISECONDS).execute(t -> {
+					plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmdf.replace("{newvip}", newVip));
+				}).submit(plugin);
+				delay++;
 			} else {
-				plugin.getExecutor().schedule(new Runnable(){
-					@Override
-					public void run() {
-						plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmdf.replace("{newvip}", newVipf));
-					}					
-				}, 1, TimeUnit.SECONDS);
+				plugin.getGame().getScheduler().createTaskBuilder().delay(delay*100, TimeUnit.MILLISECONDS).execute(t -> {
+					plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmdf);
+				}).submit(plugin);
+				delay++;
 			}
 		}
-		save();
+		reloadPerms();
 	}
 	
 	private void removeVip(User p, String group){
 		config.getNode("activeVips",group).removeChild(p.getUniqueId().toString());
-		Sponge.getCommandManager().process(Sponge.getServer().getConsole(), getString("","configs","cmdOnRemoveVip").replace("{p}", p.getName()).replace("{vip}", group));
+		plugin.getGame().getScheduler().createTaskBuilder().delay(delay*100, TimeUnit.MILLISECONDS).execute(t -> {
+			Sponge.getCommandManager().process(Sponge.getServer().getConsole(), getString("","configs","cmdOnRemoveVip").replace("{p}", p.getName()).replace("{vip}", group));			
+		}).submit(plugin);
+		delay++;
 	}
 	
 	public void removeVip(User p, Optional<String> optg){
@@ -262,7 +316,7 @@ public class PVConfig {
 		List<String[]> vipInfo = plugin.getConfig().getVipInfo(uuid);
 		boolean id = false;
 		String oldGroup = "";
-		if (vipInfo.size() > 0){
+		if (vipInfo.size() > 0){			
 			for (String[] key:vipInfo){
 				String group = key[1];
 				oldGroup = key[2];
@@ -284,18 +338,23 @@ public class PVConfig {
 		}
 		if (plugin.getConfig().getVipInfo(uuid).size() == 0){			
 			for (String cmd:getListString("configs","commandsToRunOnVipFinish")){
-				if (cmd.contains("{vip}")){continue;}		
-				final String oldGroupf = oldGroup;
-				plugin.getExecutor().schedule(new Runnable(){
-					@Override
-					public void run() {
-						String cmdf = cmd.replace("{p}", p.getName()).replace("{playergroup}", oldGroupf);
-						plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmdf);
-					}					
-				}, 1, TimeUnit.SECONDS);				
+				if (cmd.contains("{vip}")){continue;}
+				String cmdf = cmd.replace("{p}", p.getName()).replace("{playergroup}", oldGroup);
+				plugin.getGame().getScheduler().createTaskBuilder().delay(delay*100, TimeUnit.MILLISECONDS).execute(t -> {
+					plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), cmdf);
+				}).submit(plugin);		
+				delay++;
 			}
 		}
+		reloadPerms();
 		save();
+	}
+	
+	public void reloadPerms(){
+		plugin.getGame().getScheduler().createTaskBuilder().delay(1+delay*100, TimeUnit.MILLISECONDS).execute(t -> {
+			plugin.getGame().getCommandManager().process(Sponge.getServer().getConsole(), getString("","configs","cmdToReloadPermPlugin"));				
+		}).submit(plugin);	
+		delay=0;
 	}
 	
 	public long getLong(int def, String...node){
@@ -351,24 +410,19 @@ public class PVConfig {
 	
 	public HashMap<String,List<String[]>> getVipList(){
 		HashMap<String,List<String[]>> vips = new HashMap<String,List<String[]>>();		
-		for (Object groupobj:getGroupList()){
-			for (Object uuidobj:config.getNode("activeVips",groupobj).getChildrenMap().keySet()){
-				String uuid = uuidobj.toString();
-				plugin.getLogger().info("UUID "+uuid); 
-				
+		getGroupList().forEach(groupobj -> {
+			config.getNode("activeVips",groupobj).getChildrenMap().keySet().forEach(uuidobj -> {
+				String uuid = uuidobj.toString();				
 				List<String[]> vipInfo = getVipInfo(uuid);
 				List<String[]> activeVips = new ArrayList<String[]>();
-				for (String[] active:vipInfo){
-					if (active[3].equals("true")){
-						activeVips.add(active);
-						plugin.getLogger().info("Active Group "+active[1]); 
-					}
-				}
+				vipInfo.stream().filter(v->v[3].equals("true")).forEach(active -> {
+					activeVips.add(active);					
+				});				
 				if (activeVips.size() > 0){
 					vips.put(uuid, activeVips);
 				}
-			}
-		}
+			});			
+		});
 		return vips;
 	}
 	
@@ -379,11 +433,9 @@ public class PVConfig {
 	 */
 	public List<String[]> getVipInfo(String puuid){
 		List<String[]> vips = new ArrayList<String[]>();
-		for (Object key:getGroupList()){			
-			if (config.getNode("activeVips",key.toString(),puuid).hasMapChildren()){
-				vips.add(new String[]{getString("","activeVips",key.toString(),puuid,"duration"), key.toString(), getString("","activeVips",key.toString(),puuid,"playerGroup"), getString("","activeVips",key.toString(),puuid,"active")});
-			}
-		}		
+		getGroupList().stream().filter(k->config.getNode("activeVips",k.toString(),puuid).hasMapChildren()).forEach(key ->{
+			vips.add(new String[]{getString("","activeVips",key.toString(),puuid,"duration"), key.toString(), getString("","activeVips",key.toString(),puuid,"playerGroup"), getString("","activeVips",key.toString(),puuid,"active")});
+		});				
 		return vips;
 	}
 	

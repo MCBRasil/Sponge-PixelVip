@@ -3,6 +3,7 @@ package br.net.fabiozumbi12.pixelvip;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import ninja.leaping.configurate.commented.CommentedConfigurationNode;
@@ -22,7 +23,7 @@ import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.game.state.GameStartedServerEvent;
 import org.spongepowered.api.event.game.state.GameStoppingServerEvent;
 import org.spongepowered.api.plugin.Plugin;
-import org.spongepowered.api.scheduler.SpongeExecutorService;
+import org.spongepowered.api.scheduler.Task;
 import org.spongepowered.api.text.Text;
 
 import br.net.fabiozumbi12.pixelvip.cmds.PVCommands;
@@ -76,17 +77,14 @@ public class PixelVip {
 		return this.util;
 	}
 	
-	String version = "0.0.1";
+	String version = "0.0.2";
 
-	private SpongeExecutorService executor;
-	public SpongeExecutorService getExecutor(){
-		return this.executor;
-	}
-		
 	private PVCommands cmds;
 	public PVCommands getCmds(){
 		return this.cmds;
 	}
+	
+	private Task task;
 	
 	@Listener
     public void onServerStart(GameStartedServerEvent event) {
@@ -110,7 +108,8 @@ public class PixelVip {
 			    	if (args.hasAny("reload")){
 			    		this.config = new PVConfig(this, configDir, defConfig);
 			    		this.cmds.reload();
-			    		logger.info(util.toColor("&aPixelVip reloaded"));
+			    		reloadVipTask();
+			    		src.sendMessage(util.toText("&aPixelVip reloaded"));
 			    	} else {
 			    		src.sendMessage(util.toText("&a> PixelVip "+version+" by &6FabioZumbi12"));
 			    	}
@@ -120,32 +119,8 @@ public class PixelVip {
 			    .build();
 		Sponge.getCommandManager().register(this, spongevip, "pixelvip");
 						
-		logger.info("Init scheduler module...");
-		this.executor = game.getScheduler().createSyncExecutor(this);		
-		
-		executor.scheduleAtFixedRate(new Runnable(){
-			@Override
-			public void run() {
-				getLogger().warn("Running vip scheduler... i am a debug message!");
-				getConfig().getVipList().forEach((uuid,value)->{
-					Optional<User> p = util.getUser(uuid);
-					getLogger().info("UUID: " + uuid);
-					
-					getConfig().getVipList().get(uuid).forEach((vipInfo)->{
-						long dur = new Long(vipInfo[0]);
-						getLogger().info("Duration: " + dur);
-						getLogger().info("Now: " + util.getNowMillis());
-						if (dur >= util.getNowMillis() && p.isPresent()){
-							getConfig().removeVip(p.get(), Optional.of(vipInfo[1]));
-							if (p.get().isOnline()){
-								p.get().getPlayer().get().sendMessage(util.toText(config.getLang("_pluginTag","vipEnded").replace("{vip}", vipInfo[1])));
-							}
-							getLogger().info(util.toColor(config.getLang("_pluginTag")+" &bThe vip &6" + vipInfo[1] + "&b of player &6" + p.get().getName() + " &bhas ended!"));
-						}
-					});
-				});				
-			}			
-		}, 10, 60, TimeUnit.SECONDS);
+		logger.info("Init scheduler module...");	
+		reloadVipTask();		
 		
 		logger.info(util.toColor("We have &6"+config.getVipList().size()+" &ractive Vips"));
 		logger.info(util.toColor("&aPixelVip enabled!&r"));
@@ -153,8 +128,38 @@ public class PixelVip {
 	
 	@Listener
 	public void onStopServer(GameStoppingServerEvent e) {
-		executor.shutdown();
+		task.cancel();
 		config.save();
 		logger.info(util.toColor("&aPixelVip disabled!&r"));
+	}
+	
+	private void reloadVipTask(){
+		logger.info("Reloading tasks...");
+		if (task != null){
+			task.cancel();
+			logger.info("-> Task stoped");
+		}
+				
+		task = game.getScheduler().createTaskBuilder().interval(60, TimeUnit.SECONDS).execute(t -> {						
+			getConfig().getVipList().forEach((uuid,value)->{
+				Optional<User> p = util.getUser(UUID.fromString(uuid));				
+				getConfig().getVipList().get(uuid).forEach((vipInfo)->{
+					long dur = new Long(vipInfo[0]);										
+					if (p.isPresent()){
+						if (!perms.getGroup(p.get()).equals(vipInfo[1])){
+							config.runChangeVipCmds(uuid, vipInfo[1], perms.getGroup(p.get()));
+						}						
+						if (dur <= util.getNowMillis()){
+							getConfig().removeVip(p.get(), Optional.of(vipInfo[1]));
+							if (p.get().isOnline()){
+								p.get().getPlayer().get().sendMessage(util.toText(config.getLang("_pluginTag","vipEnded").replace("{vip}", vipInfo[1])));
+							}
+							getLogger().info(util.toColor(config.getLang("_pluginTag")+"&bThe vip &6" + vipInfo[1] + "&b of player &6" + p.get().getName() + " &bhas ended!"));
+						}
+					}					
+				});
+			});
+		}).submit(this);
+		logger.info("-> Task started");
 	}
 }
